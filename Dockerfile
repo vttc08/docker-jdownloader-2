@@ -62,8 +62,9 @@ VOLUME [ "/world", "/config" ]
 
 # Metadata.
 LABEL \
+      maintainer="vttc08" \
       org.label-schema.name="mcaselector" \
       org.label-schema.description="Docker container for MCASelector" \
       org.label-schema.version="${DOCKER_IMAGE_VERSION:-unknown}" \
-      org.label-schema.vcs-url="https://github.com/jlesage/docker-jdownloader-2" \
+      org.label-schema.vcs-url="https://github.com/vttc08/docker-mcaselector" \
       org.label-schema.schema-version="1.0"
