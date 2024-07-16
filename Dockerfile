@@ -12,79 +12,58 @@
 #       implementing a wrapper is not straight-forward because the `struct stat`
 #       is not constant across architectures (32/64 bits) and glibc/musl.
 #
-
-# Docker image version is provided via build arg.
 ARG DOCKER_IMAGE_VERSION=
 
-# Define software download URLs.
-ARG JDOWNLOADER_URL=http://installer.jdownloader.org/JDownloader.jar
+ARG VERSION=2.4.1
+ARG MCA_DOWNLOAD_URL="https://github.com/Querz/mcaselector/releases/download/${VERSION}/mcaselector-${VERSION}.jar"
+ARG JAVAFX_DOWNLOAD_URL="https://download2.gluonhq.com/openjfx/21.0.3/openjfx-21.0.3_linux-x64_bin-sdk.zip"
 
-# Download JDownloader2
-FROM --platform=$BUILDPLATFORM alpine:3.16 AS jd2
-ARG JDOWNLOADER_URL
+# Download dependencies
+FROM alpine:3.16 AS downloader
+ARG MCA_DOWNLOAD_URL
+ARG JAVAFX_DOWNLOAD_URL
 RUN \
-    apk --no-cache add curl && \
-    mkdir -p /defaults && \
-    curl -# -L -o /defaults/JDownloader.jar ${JDOWNLOADER_URL}
+    apk add --no-cache curl unzip && \
+    curl -# -L -o /mcaselector.jar "$MCA_DOWNLOAD_URL" && \
+    curl -# -L -o /openjfx.zip "$JAVAFX_DOWNLOAD_URL" && \
+    unzip /openjfx.zip -d /openjfx
 
 # Pull base image.
-FROM jlesage/baseimage-gui:alpine-3.16-v4.6.3
+FROM jlesage/baseimage-gui:ubuntu-22.04-v4.6.3
 
 ARG DOCKER_IMAGE_VERSION
 
 # Define working directory.
 WORKDIR /tmp
 
-# Install dependencies.
 RUN \
-    add-pkg \
-        java-common \
-        openjdk8-jre \
-        # Needed by the init script.
-        jq \
-        # We need a font.
-        ttf-dejavu \
-        # For ffmpeg and ffprobe tools.
-        ffmpeg \
-        # For rtmpdump tool.
-        rtmpdump \
-        # Need for the sponge tool.
-        moreutils
-
+    apt update && \
+    apt install -y openjdk-21-jre && \
+    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+    
+COPY rootfs/ /
 # Generate and install favicons.
 RUN \
-    APP_ICON_URL=https://raw.githubusercontent.com/jlesage/docker-templates/master/jlesage/images/jdownloader-2-icon.png && \
+    APP_ICON_URL="file:///defaults/icon.png" && \
     install_app_icon.sh "$APP_ICON_URL"
 
 # Add files.
-COPY rootfs/ /
-COPY --from=jd2 /defaults/JDownloader.jar /defaults/JDownloader.jar
+
+COPY --from=downloader /mcaselector.jar /defaults/mcaselector.jar
+COPY --from=downloader /openjfx/javafx-sdk-21.0.3 /openjfx
 
 # Set internal environment variables.
 RUN \
-    set-cont-env APP_NAME "JDownloader 2" && \
+    set-cont-env APP_NAME "MCASelector" && \
     set-cont-env DOCKER_IMAGE_VERSION "$DOCKER_IMAGE_VERSION" && \
     true
 
-# Set public environment variables.
-ENV \
-    MYJDOWNLOADER_EMAIL= \
-    MYJDOWNLOADER_PASSWORD= \
-    MYJDOWNLOADER_DEVICE_NAME= \
-    JDOWNLOADER_HEADLESS=0 \
-    JDOWNLOADER_MAX_MEM=
-
-# Define mountable directories.
-VOLUME ["/output"]
-
-# Expose ports.
-#   - 3129: For MyJDownloader in Direct Connection mode.
-EXPOSE 3129
+VOLUME [ "/world", "/config" ]
 
 # Metadata.
 LABEL \
-      org.label-schema.name="jdownloader-2" \
-      org.label-schema.description="Docker container for JDownloader 2" \
+      org.label-schema.name="mcaselector" \
+      org.label-schema.description="Docker container for MCASelector" \
       org.label-schema.version="${DOCKER_IMAGE_VERSION:-unknown}" \
       org.label-schema.vcs-url="https://github.com/jlesage/docker-jdownloader-2" \
       org.label-schema.schema-version="1.0"
